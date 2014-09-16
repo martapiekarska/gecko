@@ -27,6 +27,7 @@
 #include "mozilla/dom/PermissionMessageUtils.h"
 
 #include "nsJSUtils.h"
+#include "prdtoa.h"
 
 class nsIPrincipal;
 
