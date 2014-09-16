@@ -27,4 +27,5 @@ interface nsIDOMGeoGeolocation : nsISupports
                           in nsIDOMGeoPositionErrorCallback errorCallback,
                           in NamespacedPositionOptions options);
   void clearWatch(in long watchId);
+  void setManifestURL(in DOMString manifestURL);
 };

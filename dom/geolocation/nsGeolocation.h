@@ -177,6 +177,8 @@ public:
   // Notification from the service:
   void ServiceReady();
 
+  nsString GetManifestURL();
+
 private:
 
   ~Geolocation();
@@ -213,6 +215,9 @@ private:
 
   // Pending requests are used when the service is not ready
   nsTArray<nsRefPtr<nsGeolocationRequest> > mPendingRequests;
+
+  nsString mManifestURL;
+
 };
 
 class PositionError MOZ_FINAL : public nsIDOMGeoPositionError,

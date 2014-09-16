@@ -29,6 +29,8 @@ interface Geolocation {
                      optional PositionOptions options);
 
   void clearWatch(long watchId);
+
+  void setManifestURL(DOMString manifestURL);
 };
 
 callback PositionCallback = void (Position position);

@@ -102,6 +102,12 @@ class nsGeolocationRequest MOZ_FINAL
   double GridAlgorithm(int32_t aRadius, double aKmSize, double aCoord);
   double CalcLatByGridAlgorithm(int32_t aRadius, double aLatitude);
   double CalcLonByGridAlgorithm(int32_t aRadius, double aLongitude, double aLatitude);
+  nsIDOMGeoPosition* FakeLocation(nsIDOMGeoPosition* aPosition, double aLatitude, double aLongitude);
+  nsIDOMGeoPosition* BlurLocation(nsIDOMGeoPosition* aPosition, int32_t aRadius);
+  nsIDOMGeoPosition* ChangeLocation(nsIDOMGeoPosition* aPosition);
+
+  nsGeoBlurSettings* GetBlurSettings();
+  NS_IMETHODIMP GetAppManifestURL(nsString& aAppManifestURL);
 
   bool mIsWatchPositionRequest;
 
@@ -605,6 +611,81 @@ nsGeolocationRequest::StopTimeoutTimer()
   }
 }
 
+nsIDOMGeoPosition*
+nsGeolocationRequest::ChangeLocation(nsIDOMGeoPosition* aPosition) {
+  if (XRE_GetProcessType() == GeckoProcessType_Content) {
+    return aPosition;
+  }
+
+  nsGeoBlurSettings* blurSettings = GetBlurSettings();
+
+  if(!blurSettings || blurSettings->IsExactLoaction()) {
+    return aPosition;
+  }
+
+  if(blurSettings->IsBluredLocation()) {
+    return BlurLocation(aPosition, blurSettings->GetRadius());
+  }
+
+  if(blurSettings->IsFakeLocation() && blurSettings->HasValidCoords()) {
+    return FakeLocation(aPosition, blurSettings->GetLatitude(), blurSettings->GetLongitude());
+  }
+
+  return nullptr;
+}
+
+nsGeoBlurSettings*
+nsGeolocationRequest::GetBlurSettings() {
+  nsGeoBlurSettings* blurSettings = &sGlobalBlurSettings;
+  nsString appManifestURL;
+
+  if(NS_SUCCEEDED(GetAppManifestURL(appManifestURL))) {
+    for(size_t i = 0; i < sExceptionsAppBlurSettings.Length(); i++) {
+      nsGeoBlurSettings appSettings = sExceptionsAppBlurSettings.ElementAt(i);
+
+      if(appManifestURL == appSettings.GetManifestURL()) {
+        blurSettings = &appSettings;
+        break;
+      }
+    }
+  }
+
+  return blurSettings;
+}
+
+NS_IMETHODIMP
+nsGeolocationRequest::GetAppManifestURL(nsString& aAppManifestURL)
+{
+  aAppManifestURL = mLocator->GetManifestURL();
+  if (aAppManifestURL.IsEmpty()) {
+    return NS_ERROR_FAILURE;
+  }
+
+  return NS_OK;
+}
+
+nsIDOMGeoPosition*
+nsGeolocationRequest::BlurLocation(nsIDOMGeoPosition* aPosition, int32_t aRadius) {
+  if (aPosition) {
+    nsCOMPtr<nsIDOMGeoPositionCoords> coords;
+    aPosition->GetCoords(getter_AddRefs(coords));
+
+    if (coords) {
+      double latitude = 0;
+      double longitude = 0;
+      coords->GetLatitude(&latitude);
+      coords->GetLongitude(&longitude);
+
+      longitude = CalcLonByGridAlgorithm(aRadius, longitude, latitude);
+      latitude = CalcLatByGridAlgorithm(aRadius, latitude);
+
+      aPosition = FakeLocation(aPosition, latitude, longitude);
+    }
+  }
+
+  return aPosition;
+}
+
 double
 nsGeolocationRequest::GridAlgorithm(int32_t aRadius, double aKmSize, double aCoord)
 {
@@ -626,6 +707,38 @@ nsGeolocationRequest::CalcLonByGridAlgorithm(int32_t aRadius, double aLongitude,
   double fi = (aLatitude * 3.14) / 180;
   double kmSize = 3600 / (cos(fi) * 111.27);
   return GridAlgorithm(aRadius, kmSize, aLongitude);
+}
+
+nsIDOMGeoPosition*
+nsGeolocationRequest::FakeLocation(nsIDOMGeoPosition* aPosition, double aLatitude, double aLongitude)
+{
+  if (!aPosition) {
+    return nullptr;
+  }
+
+  nsCOMPtr<nsIDOMGeoPositionCoords> coords;
+  aPosition->GetCoords(getter_AddRefs(coords));
+
+  if (!coords) {
+    return aPosition;
+  }
+
+  double altitude = 0;
+  double accuracy = 0;
+  double altitudeAccuracy = 0;
+  double heading = 0;
+  double speed = 0;
+  DOMTimeStamp timeStamp;
+
+  coords->GetAltitude(&altitude);
+  coords->GetAccuracy(&accuracy);
+  coords->GetAltitudeAccuracy(&altitudeAccuracy);
+  coords->GetHeading(&heading);
+  coords->GetSpeed(&speed);
+
+  aPosition->GetTimestamp(&timeStamp);
+
+  return new nsGeoPosition(aLatitude, aLongitude, altitude, accuracy, altitudeAccuracy, heading, speed, timeStamp);
 }
 
 void
@@ -653,7 +766,10 @@ nsGeolocationRequest::SendLocation(nsIDOMGeoPosition* aPosition)
     nsCOMPtr<nsIDOMGeoPositionCoords> coords;
     aPosition->GetCoords(getter_AddRefs(coords));
     if (coords) {
-      wrapped = new Position(ToSupports(mLocator), aPosition);
+      aPosition = ChangeLocation(aPosition);
+      if(aPosition) {
+        wrapped = new Position(ToSupports(mLocator), aPosition);
+      }
     }
   }
 
@@ -1782,6 +1898,20 @@ Geolocation::RegisterRequestWithPrompt(nsGeolocationRequest* request)
   NS_DispatchToMainThread(ev);
   return true;
 }
+
+NS_IMETHODIMP
+Geolocation::SetManifestURL(const nsAString& aManifestURL)
+{
+  mManifestURL = aManifestURL;
+  return NS_OK;
+}
+
+nsString
+Geolocation::GetManifestURL()
+{
+  return mManifestURL;
+}
+
 
 JSObject*
 Geolocation::WrapObject(JSContext *aCtx)

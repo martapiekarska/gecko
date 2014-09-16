@@ -3555,7 +3555,7 @@ ContentParent::RecvFilePathUpdateNotify(const nsString& aType,
 }
 
 static int32_t
-AddGeolocationListener(nsIDOMGeoPositionCallback* watcher, bool highAccuracy)
+AddGeolocationListener(nsIDOMGeoPositionCallback* watcher, bool highAccuracy, nsString manifestURL)
 {
     nsCOMPtr<nsIDOMGeoGeolocation> geo = do_GetService("@mozilla.org/geolocation;1");
     if (!geo) {
@@ -3567,6 +3567,7 @@ AddGeolocationListener(nsIDOMGeoPositionCallback* watcher, bool highAccuracy)
     options->mMaximumAge = 0;
     options->mEnableHighAccuracy = highAccuracy;
     int32_t retval = 1;
+    geo->SetManifestURL(manifestURL);
     geo->WatchPosition(watcher, nullptr, options, &retval);
     return retval;
 }
@@ -3588,7 +3589,7 @@ ContentParent::RecvAddGeolocationListener(const IPC::Principal& aPrincipal,
     // To ensure no geolocation updates are skipped, we always force the
     // creation of a new listener.
     RecvRemoveGeolocationListener();
-    mGeolocationWatchID = AddGeolocationListener(this, aHighAccuracy);
+    mGeolocationWatchID = AddGeolocationListener(this, aHighAccuracy, mAppManifestURL);
     return true;
 }
 
@@ -3613,7 +3614,7 @@ ContentParent::RecvSetGeolocationHigherAccuracy(const bool& aEnable)
     // so this check allows us to forgo securing privileges.
     if (mGeolocationWatchID != -1) {
         RecvRemoveGeolocationListener();
-        mGeolocationWatchID = AddGeolocationListener(this, aEnable);
+        mGeolocationWatchID = AddGeolocationListener(this, aEnable, mAppManifestURL);
     }
     return true;
 }

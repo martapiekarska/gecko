@@ -11,7 +11,7 @@
 nsGeoBlurSettings::nsGeoBlurSettings()
   : mBlurType(GEO_BLUR_TYPE_PRECISE)
   , mRadius(0)
-  , mCoordsValid(false)
+  , mHasValidCoords(false)
   , mLatitude(0)
   , mLongitude(0)
 {
@@ -91,13 +91,13 @@ nsGeoBlurSettings::SetCoords(nsString aCoords)
 			return;
 		}
 
-		mCoordsValid = true;
+		mHasValidCoords = true;
 	}
 }
 
 void
 nsGeoBlurSettings::ClearCoords() {
-  mCoordsValid = false;
+  mHasValidCoords = false;
 
 	mLatitude = 0;
 	mLongitude = 0;
@@ -119,4 +119,10 @@ bool
 nsGeoBlurSettings::IsBluredLocation()
 {
 	return mBlurType == GEO_BLUR_TYPE_BLUR;
+}
+
+bool
+nsGeoBlurSettings::HasValidCoords()
+{
+	return mHasValidCoords;
 }

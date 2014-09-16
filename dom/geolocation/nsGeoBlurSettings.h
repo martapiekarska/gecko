@@ -28,6 +28,7 @@ class nsGeoBlurSettings MOZ_FINAL
     bool IsExactLoaction();
     bool IsFakeLocation();
     bool IsBluredLocation();
+    bool HasValidCoords();
 
     int32_t GetRadius();
     double GetLatitude();
@@ -44,7 +45,7 @@ class nsGeoBlurSettings MOZ_FINAL
     nsString mManifestURL;
     int32_t mBlurType;
     int32_t mRadius;
-    bool mCoordsValid;
+    bool mHasValidCoords;
     double mLatitude, mLongitude;
 };
 
