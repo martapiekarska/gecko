@@ -10,6 +10,7 @@
 #include "nsISettingsService.h"
 
 #include "nsGeolocation.h"
+#include "nsGeoBlurSettings.h"
 #include "nsDOMClassInfoID.h"
 #include "nsComponentManagerUtils.h"
 #include "nsServiceManagerUtils.h"
@@ -25,7 +26,7 @@
 #include "mozilla/ClearOnShutdown.h"
 #include "mozilla/dom/PermissionMessageUtils.h"
 
-#include "prdtoa.h"
+#include "nsJSUtils.h"
 
 class nsIPrincipal;
 
@@ -51,6 +52,15 @@ class nsIPrincipal;
 
 // The settings key.
 #define GEO_SETINGS_ENABLED          "geolocation.enabled"
+#define GEO_BLUR_TYPE                "geolocation.blur.type"
+#define GEO_BLUR_RADIUS              "geolocation.blur.radius"
+#define GEO_BLUR_COORDS              "geolocation.blur.coords"
+#define GEO_EXCEPTIONS               "geolocation.exceptions"
+#define GEO_UNBLURED                 "geolocation.unblured"
+
+static nsGeoBlurSettings sGlobalBlurSettings;
+static nsTArray<nsGeoBlurSettings> sExceptionsAppBlurSettings;
+static nsTArray<nsString> sUnbluredApps;
 
 using mozilla::unused;          // <snicker>
 using namespace mozilla;
@@ -135,22 +145,83 @@ public:
   {
     MOZ_ASSERT(NS_IsMainThread());
 
-    // The geolocation is enabled by default:
-    bool value = true;
-    if (aResult.isBoolean()) {
-      value = aResult.toBoolean();
+    if(aName.EqualsASCII(GEO_SETINGS_ENABLED)) {
+      // The geolocation is enabled by default:
+      bool value = true;
+      if (aResult.isBoolean()) {
+        value = aResult.toBoolean();
+      }
+
+      MozSettingValue(value);
+    } else if(aName.EqualsASCII(GEO_BLUR_TYPE)) {
+      int32_t value = GEO_BLUR_TYPE_PRECISE;
+      if (aResult.isInt32()) {
+        value = aResult.toInt32();
+      }
+
+      MozSettingBlurTypeValue(value);
+    } else if(aName.EqualsASCII(GEO_BLUR_RADIUS)) {
+      int32_t value = 0;
+      if (aResult.isInt32()) {
+        value = aResult.toInt32();
+      }
+
+      MozSettingRadiusValue(value);
+    } else if(aName.EqualsASCII(GEO_BLUR_COORDS)) {
+      JSString* value = nullptr;
+      if (aResult.isString()) {
+        value = aResult.toString();
+      }
+
+      MozSettingCoordsValue(value);
+    } else if(aName.EqualsASCII(GEO_EXCEPTIONS)) {
+      JSObject* value = nullptr;
+      if (aResult.isObject()) {
+        value = &aResult.toObject();
+      }
+
+      MozSettingExceptionsAppsValue(value);
+    } else if(aName.EqualsASCII(GEO_UNBLURED)) {
+      JSObject* value = nullptr;
+      if (aResult.isObject()) {
+        value = &aResult.toObject();
+      }
+
+      MozSettingUnbluredAppsValue(value);
     }
 
-    MozSettingValue(value);
     return NS_OK;
   }
 
   NS_IMETHOD HandleError(const nsAString& aName)
   {
-    NS_WARNING("Unable to get value for '" GEO_SETINGS_ENABLED "'");
+    if(aName.EqualsASCII(GEO_SETINGS_ENABLED)) {
+      NS_WARNING("Unable to get value for '" GEO_SETINGS_ENABLED "'");
 
-    // Default it's enabled:
-    MozSettingValue(true);
+      // Default it's enabled:
+      MozSettingValue(true);
+    } else if(aName.EqualsASCII(GEO_BLUR_TYPE)) {
+      NS_WARNING("Unable to get value for '" GEO_BLUR_TYPE "'");
+
+      MozSettingBlurTypeValue(GEO_BLUR_TYPE_PRECISE);
+    } else if(aName.EqualsASCII(GEO_BLUR_RADIUS)) {
+      NS_WARNING("Unable to get value for '" GEO_BLUR_RADIUS "'");
+
+      MozSettingRadiusValue(0);
+    } else if(aName.EqualsASCII(GEO_BLUR_COORDS)) {
+      NS_WARNING("Unable to get value for '" GEO_BLUR_COORDS "'");
+
+      MozSettingCoordsValue(nullptr);
+    } else if(aName.EqualsASCII(GEO_EXCEPTIONS)) {
+      NS_WARNING("Unable to get value for '" GEO_EXCEPTIONS "'");
+
+      MozSettingExceptionsAppsValue(nullptr);
+    } else if(aName.EqualsASCII(GEO_UNBLURED)) {
+      NS_WARNING("Unable to get value for '" GEO_UNBLURED "'");
+
+      MozSettingUnbluredAppsValue(nullptr);
+    }
+
     return NS_OK;
   }
 
@@ -159,6 +230,46 @@ public:
     nsRefPtr<nsGeolocationService> gs = nsGeolocationService::GetGeolocationService();
     if (gs) {
       gs->HandleMozsettingValue(aValue);
+    }
+  }
+
+  void MozSettingBlurTypeValue(int32_t aValue)
+  {
+    nsRefPtr<nsGeolocationService> gs = nsGeolocationService::GetGeolocationService();
+    if (gs) {
+      gs->HandleMozsettingBlurTypeValue(aValue);
+    }
+  }
+
+  void MozSettingRadiusValue(int32_t aValue)
+  {
+    nsRefPtr<nsGeolocationService> gs = nsGeolocationService::GetGeolocationService();
+    if (gs) {
+      gs->HandleMozsettingRadiusValue(aValue);
+    }
+  }
+
+  void MozSettingCoordsValue(JSString* aValue)
+  {
+    nsRefPtr<nsGeolocationService> gs = nsGeolocationService::GetGeolocationService();
+    if (gs) {
+      gs->HandleMozsettingCoordsValue(aValue);
+    }
+  }
+
+  void MozSettingExceptionsAppsValue(JSObject* aValue)
+  {
+    nsRefPtr<nsGeolocationService> gs = nsGeolocationService::GetGeolocationService();
+    if (gs) {
+      gs->HandleMozsettingExceptionsAppsValue(aValue);
+    }
+  }
+
+  void MozSettingUnbluredAppsValue(JSObject* aValue)
+  {
+    nsRefPtr<nsGeolocationService> gs = nsGeolocationService::GetGeolocationService();
+    if (gs) {
+      gs->HandleMozsettingUnbluredAppsValue(aValue);
     }
   }
 };
@@ -677,6 +788,26 @@ nsresult nsGeolocationService::Init()
     nsRefPtr<GeolocationSettingsCallback> callback = new GeolocationSettingsCallback();
     rv = settingsLock->Get(GEO_SETINGS_ENABLED, callback);
     NS_ENSURE_SUCCESS(rv, rv);
+
+    callback = new GeolocationSettingsCallback();
+    rv = settingsLock->Get(GEO_BLUR_TYPE, callback);
+    NS_ENSURE_SUCCESS(rv, rv);
+
+    callback = new GeolocationSettingsCallback();
+    rv = settingsLock->Get(GEO_BLUR_RADIUS, callback);
+    NS_ENSURE_SUCCESS(rv, rv);
+
+    callback = new GeolocationSettingsCallback();
+    rv = settingsLock->Get(GEO_BLUR_COORDS, callback);
+    NS_ENSURE_SUCCESS(rv, rv);
+
+    callback = new GeolocationSettingsCallback();
+    rv = settingsLock->Get(GEO_EXCEPTIONS, callback);
+    NS_ENSURE_SUCCESS(rv, rv);
+
+    callback = new GeolocationSettingsCallback();
+    rv = settingsLock->Get(GEO_UNBLURED, callback);
+    NS_ENSURE_SUCCESS(rv, rv);
   } else {
     // If we cannot obtain the settings service, we continue
     // assuming that the geolocation is enabled:
@@ -761,16 +892,43 @@ nsGeolocationService::HandleMozsettingChanged(const char16_t* aData)
     }
 
     bool match;
-    if (!JS_StringEqualsAscii(cx, key.toString(), GEO_SETINGS_ENABLED, &match) || !match) {
-      return;
-    }
-
     JS::Rooted<JS::Value> value(cx);
-    if (!JS_GetProperty(cx, obj, "value", &value) || !value.isBoolean()) {
-      return;
+
+    if (JS_StringEqualsAscii(cx, key.toString(), GEO_SETINGS_ENABLED, &match) && match) {
+      if (JS_GetProperty(cx, obj, "value", &value) && value.isBoolean()) {
+        HandleMozsettingValue(value.toBoolean());
+      }
     }
 
-    HandleMozsettingValue(value.toBoolean());
+    if (JS_StringEqualsAscii(cx, key.toString(), GEO_BLUR_TYPE, &match) && match) {
+      if (JS_GetProperty(cx, obj, "value", &value) && value.isInt32()) {
+        HandleMozsettingBlurTypeValue(value.toInt32());
+      }
+    }
+
+    if (JS_StringEqualsAscii(cx, key.toString(), GEO_BLUR_RADIUS, &match) && match) {
+      if (JS_GetProperty(cx, obj, "value", &value) && value.isInt32()) {
+        HandleMozsettingRadiusValue(value.toInt32());
+      }
+    }
+
+    if (JS_StringEqualsAscii(cx, key.toString(), GEO_BLUR_COORDS, &match) && match) {
+      if (JS_GetProperty(cx, obj, "value", &value) && value.isString()) {
+        HandleMozsettingCoordsValue(value.toString());
+      }
+    }
+
+    if (JS_StringEqualsAscii(cx, key.toString(), GEO_EXCEPTIONS, &match) && match) {
+      if (JS_GetProperty(cx, obj, "value", &value) && value.isObject()) {
+         HandleMozsettingExceptionsAppsValue(&value.toObject());
+      }
+    }
+
+    if (JS_StringEqualsAscii(cx, key.toString(), GEO_UNBLURED, &match) && match) {
+      if (JS_GetProperty(cx, obj, "value", &value) && value.isObject()) {
+         HandleMozsettingUnbluredAppsValue(&value.toObject());
+      }
+    }
 }
 
 void
@@ -792,6 +950,135 @@ nsGeolocationService::HandleMozsettingValue(const bool aValue)
         mGeolocators[i]->ServiceReady();
       }
     }
+}
+
+void
+nsGeolocationService::HandleMozsettingBlurTypeValue(int32_t aValue)
+{
+  sGlobalBlurSettings.SetBlurType(aValue);
+}
+
+void
+nsGeolocationService::HandleMozsettingRadiusValue(int32_t aValue)
+{
+  sGlobalBlurSettings.ClearCoords();
+  sGlobalBlurSettings.SetRadius(aValue);
+}
+
+void
+nsGeolocationService::HandleMozsettingExceptionsAppsValue(JSObject* aValue)
+{
+  sExceptionsAppBlurSettings.Clear();
+
+  if(!aValue)
+   return;
+
+  AutoSafeJSContext cx;
+
+  JS::RootedObject obj(cx, aValue);
+  JS::AutoIdArray ids(cx, JS_Enumerate(cx, obj));
+
+  if (!ids)
+      return;
+
+  JS::RootedId id(cx);
+  JS::RootedValue propertyValue(cx);
+
+  for (size_t i = 0; i < ids.length(); i++) {
+    id = ids[i];
+
+    nsGeoBlurSettings appSettings;
+
+    JS::RootedValue v(cx);
+    if (!JS_IdToValue(cx, id, &v))
+      continue;
+
+    if (v.isString()) {
+      JS::RootedString str(cx, JS::ToString(cx, v));
+
+      if (!str)
+        continue;
+
+      nsString manifestURL;
+
+      if (!AssignJSString(cx, manifestURL, str))
+        continue;
+
+      appSettings.SetManifestURL(manifestURL);
+    }
+    else {
+      continue;
+    }
+
+    if (!JS_GetPropertyById(cx, obj, id, &propertyValue))
+      continue;
+
+    if(propertyValue.isObject()) {
+      JS::RootedObject settingObj(cx, &propertyValue.toObject());
+
+      JS::RootedValue blurType(cx);
+      if (JS_GetProperty(cx, settingObj, "type", &blurType) && blurType.isInt32())
+        appSettings.SetBlurType(blurType.toInt32());
+
+      JS::RootedValue radius(cx);
+      if (JS_GetProperty(cx, settingObj, "radius", &radius) && radius.isInt32())
+        appSettings.SetRadius(radius.toInt32());
+
+      JS::RootedValue coords(cx);
+      if (JS_GetProperty(cx, settingObj, "coords", &coords) && coords.isString()) {
+        nsString coordsString;
+
+        if (AssignJSString(cx, coordsString, coords.toString())) {
+          appSettings.SetCoords(coordsString);
+        }
+      }
+
+      sExceptionsAppBlurSettings.AppendElement(appSettings);
+    }
+  }
+}
+void
+nsGeolocationService::HandleMozsettingUnbluredAppsValue(JSObject* aValue)
+{
+  sUnbluredApps.Clear();
+
+  if(!aValue)
+   return;
+
+  AutoSafeJSContext cx;
+
+  JS::RootedObject obj(cx, aValue);
+  if(!JS_IsArrayObject(cx, obj))
+    return;
+
+  uint32_t length;
+  if (!JS_GetArrayLength(cx, obj, &length))
+    return;
+
+  for (uint32_t i = 0; i < length; ++i) {
+    JS::RootedValue value(cx);
+
+    if (!JS_GetElement(cx, obj, i, &value) || !value.isString())
+      continue;
+
+    nsString manifestUrl;
+    if (!AssignJSString(cx, manifestUrl, value.toString()))
+      continue;
+
+    sUnbluredApps.AppendElement(manifestUrl);
+  }
+}
+void
+nsGeolocationService::HandleMozsettingCoordsValue(JSString* aValue)
+{
+  nsString str;
+  if(aValue)
+  {
+    AutoSafeJSContext cx;
+    AssignJSString(cx, str, aValue);
+  }
+
+  sGlobalBlurSettings.SetCoords(str);
 }
 
 NS_IMETHODIMP

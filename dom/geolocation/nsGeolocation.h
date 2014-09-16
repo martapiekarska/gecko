@@ -72,6 +72,11 @@ public:
 
   void HandleMozsettingChanged(const char16_t* aData);
   void HandleMozsettingValue(const bool aValue);
+  void HandleMozsettingBlurTypeValue(int32_t aValue);
+  void HandleMozsettingRadiusValue(int32_t aValue);
+  void HandleMozsettingCoordsValue(JSString* aValue);
+  void HandleMozsettingExceptionsAppsValue(JSObject* aValue);
+  void HandleMozsettingUnbluredAppsValue(JSObject* aValue);
 
   // Management of the Geolocation objects
   void AddLocator(mozilla::dom::Geolocation* locator);
