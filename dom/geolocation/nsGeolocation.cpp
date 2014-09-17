@@ -161,8 +161,23 @@ public:
       MozSettingValue(value);
     } else if(aName.EqualsASCII(GEO_BLUR_TYPE)) {
       int32_t value = GEO_BLUR_TYPE_PRECISE;
-      if (aResult.isInt32()) {
-        value = aResult.toInt32();
+
+      if (aResult.isString()) {
+        JSString* jsStr = aResult.toString();
+        if (jsStr) {
+          nsString str;
+          AutoSafeJSContext cx;
+          AssignJSString(cx, str, jsStr);
+          if(str.EqualsASCII(GEO_BLUR_TYPE_PRECISE_S)) {
+            value = GEO_BLUR_TYPE_PRECISE;
+          } else if(str.EqualsASCII(GEO_BLUR_TYPE_BLUR_S)) {
+            value = GEO_BLUR_TYPE_BLUR;
+          } else if(str.EqualsASCII(GEO_BLUR_TYPE_CUSTOM_S)) {
+            value = GEO_BLUR_TYPE_CUSTOM;
+          } else if(str.EqualsASCII(GEO_BLUR_TYPE_NO_LOCATION_S)) {
+            value = GEO_BLUR_TYPE_NO_LOCATION;
+          }
+        }
       }
 
       MozSettingBlurTypeValue(value);
@@ -1017,8 +1032,26 @@ nsGeolocationService::HandleMozsettingChanged(const char16_t* aData)
     }
 
     if (JS_StringEqualsAscii(cx, key.toString(), GEO_BLUR_TYPE, &match) && match) {
-      if (JS_GetProperty(cx, obj, "value", &value) && value.isInt32()) {
-        HandleMozsettingBlurTypeValue(value.toInt32());
+      if (JS_GetProperty(cx, obj, "value", &value) && value.isString()) {
+        JSString* jsStr = value.toString();
+        if (jsStr) {
+          nsString str = EmptyString();
+          AutoSafeJSContext cx;
+          AssignJSString(cx, str, jsStr);
+          int32_t res = 0;
+          if(str.EqualsASCII(GEO_BLUR_TYPE_PRECISE_S)) {
+            res = GEO_BLUR_TYPE_PRECISE;
+          } else if(str.EqualsASCII(GEO_BLUR_TYPE_BLUR_S)) {
+            res = GEO_BLUR_TYPE_BLUR;
+          } else if(str.EqualsASCII(GEO_BLUR_TYPE_CUSTOM_S)) {
+            res = GEO_BLUR_TYPE_CUSTOM;
+          } else if(str.EqualsASCII(GEO_BLUR_TYPE_NO_LOCATION_S)) {
+            res = GEO_BLUR_TYPE_NO_LOCATION;
+          }
+          if(res > 0) {
+            HandleMozsettingBlurTypeValue(res);
+          }
+        }
       }
     }
 

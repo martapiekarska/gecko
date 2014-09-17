@@ -122,6 +122,12 @@ nsGeoBlurSettings::IsBluredLocation()
 }
 
 bool
+nsGeoBlurSettings::IsNoLocation()
+{
+	return mBlurType == GEO_BLUR_TYPE_NO_LOCATION;
+}
+
+bool
 nsGeoBlurSettings::HasValidCoords()
 {
 	return mHasValidCoords;

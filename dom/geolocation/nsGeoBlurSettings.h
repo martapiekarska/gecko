@@ -13,9 +13,15 @@
 // nsGeoBlurSetting
 ////////////////////////////////////////////////////
 
-#define GEO_BLUR_TYPE_PRECISE    1
-#define GEO_BLUR_TYPE_BLUR       2
-#define GEO_BLUR_TYPE_CUSTOM     3
+#define GEO_BLUR_TYPE_PRECISE_S     "precise"
+#define GEO_BLUR_TYPE_BLUR_S        "blur"
+#define GEO_BLUR_TYPE_CUSTOM_S      "user-defined"
+#define GEO_BLUR_TYPE_NO_LOCATION_S "no-location"
+
+#define GEO_BLUR_TYPE_PRECISE     1
+#define GEO_BLUR_TYPE_BLUR        2
+#define GEO_BLUR_TYPE_CUSTOM      3
+#define GEO_BLUR_TYPE_NO_LOCATION 4
 
 /**
  * Simple object that holds a single settings for location.
@@ -28,6 +34,7 @@ class nsGeoBlurSettings MOZ_FINAL
     bool IsExactLoaction();
     bool IsFakeLocation();
     bool IsBluredLocation();
+    bool IsNoLocation();
     bool HasValidCoords();
 
     int32_t GetRadius();
